@@ -20,3 +20,7 @@ venv/
 # IDE 配置
 .vscode/
 .idea/
+
+# Langgraph 生成的文件
+langgraph_cache/
+.langgraph_api
