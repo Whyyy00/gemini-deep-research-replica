@@ -60,6 +60,34 @@ def continue_to_web_research(state: QueryGenerationState):
     ]
 
 
+def web_research(state: WebSearchState) -> OverallState:
+    """Langgraph node that search one query using Tavily API.
+
+    Args:
+        state (WebSearchState): Current graph state containing the search query.
+
+    Returns:
+        OverallState: Dictionary with updates, including web_search_result, sources_gathered
+    """
+    configurable = Configuration()
+
+    # Init the Tavily client
+    tavily_client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
+
+    # Web search based on the query
+    query = state["search_query"]
+    response = tavily_client.search(
+        query=query, topic="general", max_results=configurable.max_search_results
+    )
+    web_search_result = [result["raw_content"] for result in response["results"]]
+    sources_gathered = [result["url"] for result in response["results"]]
+
+    return {
+        "web_search_result": web_search_result,
+        "sources_gathered": sources_gathered,
+    }
+
+
 builder = StateGraph(OverallState)
 
 builder.add_node("generate_query", generate_query)

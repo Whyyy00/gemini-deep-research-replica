@@ -24,3 +24,6 @@ venv/
 # Langgraph 生成的文件
 langgraph_cache/
 .langgraph_api
+
+# Jupyter Notebook
+test.ipynb
