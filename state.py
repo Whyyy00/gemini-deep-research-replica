@@ -27,7 +27,7 @@ class WebSearchState(TypedDict):
     id: str
 
 
-class WebSearchResultState(TypedDict):
-    web_search_query: str
-    web_search_result: List
-    sources: List
+class ReflectionState(TypedDict):
+    is_sufficient: bool
+    follow_up_queries: List[str]
+    research_loop_count: int

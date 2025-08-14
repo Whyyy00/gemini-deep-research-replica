@@ -16,4 +16,4 @@ class Configuration(BaseModel):
 
     max_research_loops: int = Field(default=2)
 
-    max_search_results: int = Field(default=3)
+    max_search_results: int = Field(default=2)
