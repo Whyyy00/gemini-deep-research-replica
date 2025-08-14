@@ -7,9 +7,8 @@ import operator
 class OverallState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], add_messages]
     search_query: Annotated[List, operator.add]
-    web_search_result: Annotated[List, operator.add]
+    search_result: Annotated[List, operator.add]
     sources_gathered: Annotated[List, operator.add]
-    initial_search_query_count: int
     max_research_loops: int
     research_loop_count: int
 
@@ -26,3 +25,9 @@ class QueryGenerationState(TypedDict):
 class WebSearchState(TypedDict):
     search_query: str
     id: str
+
+
+class WebSearchResultState(TypedDict):
+    web_search_query: str
+    web_search_result: List
+    sources: List

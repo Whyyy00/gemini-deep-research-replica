@@ -6,6 +6,8 @@ class Configuration(BaseModel):
 
     query_generator_model: str = Field(default="deepseek-chat")
 
+    summarize_model: str = Field(default="deepseek-chat")
+
     reflection_model: str = Field(default="deepseek-chat")
 
     answer_model: str = Field(default="deepseek-reasoner")

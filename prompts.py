@@ -32,3 +32,22 @@ Topic: What revenue grew more last year apple stock or the number of people buyi
 
 Context: {research_topic}
 """
+
+summarize_prompt = """Your task is to synthesize the following web search results into a clear, concise, and well-structured summary.
+
+Instructions:
+- Focus on summarizing only the information explicitly contained in the provided search results. Do not add, invent, or infer facts beyond the given text.
+- Highlight the most relevant and up-to-date information. The current date is {current_date}.
+- Organize the summary logically, grouping related points together.
+- Remove redundancy while preserving important details and nuances.
+
+Output:
+Directly output a comprehensive, factually accurate summary of the search results, suitable for informing further research or decision-making.
+
+Web Search Results:
+{web_search_result}
+
+Research Topic:
+{research_topic}
+
+"""
