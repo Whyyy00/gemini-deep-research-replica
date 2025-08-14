@@ -24,7 +24,6 @@ class QueryGenerationState(TypedDict):
 
 class WebSearchState(TypedDict):
     search_query: str
-    id: str
 
 
 class ReflectionState(TypedDict):

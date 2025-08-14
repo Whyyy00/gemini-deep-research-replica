@@ -1,12 +1,19 @@
+from certifi import contents
 from schemas import SearchQueryList, Reflection
 from state import OverallState, QueryGenerationState, ReflectionState, WebSearchState
 from prompts import get_current_date
-from prompts import generate_query_prompt, summarize_prompt, reflection_prompt
+from prompts import (
+    generate_query_prompt,
+    summarize_prompt,
+    reflection_prompt,
+    answer_prompt,
+)
 from configuration import Configuration
 
 from langgraph.graph import StateGraph, START, END
 from langchain_deepseek import ChatDeepSeek
 from langgraph.types import Send
+from langchain_core.messages import AIMessage
 
 from utils import get_research_topic
 
@@ -57,8 +64,8 @@ def generate_query(state: OverallState) -> QueryGenerationState:
 def continue_to_web_research(state: QueryGenerationState):
     """Langgraph node that send search quries to the web search node."""
     return [
-        Send("web_research", {"search_query": search_query, "id": int(idx)})
-        for idx, search_query in enumerate(state["search_query"])
+        Send("web_research", {"search_query": search_query})
+        for search_query in state["search_query"]
     ]
 
 
@@ -84,7 +91,7 @@ def web_research(state: WebSearchState) -> OverallState:
         max_results=configurable.max_search_results,
         include_raw_content=True,
     )
-    web_search_result = [result["raw_content"] for result in response["results"]]
+    web_search_result = [result["content"] for result in response["results"]]
     sources_gathered = [result["url"] for result in response["results"]]
 
     llm = ChatDeepSeek(
@@ -140,17 +147,57 @@ def reflection(state: OverallState) -> ReflectionState:
     }
 
 
+def evaluate_research(state: ReflectionState) -> OverallState:
+    configurable = Configuration()
+    if (
+        state["research_loop_count"] >= configurable.max_research_loops
+        or state["is_sufficient"] == True
+    ):
+        return "finalize_answer"
+    else:
+        return [
+            Send("web_research", {"search_query": follow_up_query})
+            for follow_up_query in state["follow_up_queries"]
+        ]
+
+
+def finalize_answer(state: OverallState) -> OverallState:
+    configurable = Configuration()
+    formatted_prompt = answer_prompt.format(
+        current_date=get_current_date(),
+        research_topic=get_research_topic(state["messages"]),
+        summaries=state["web_search_result"],
+    )
+
+    llm = ChatDeepSeek(
+        model=configurable.answer_model,
+        api_key=os.getenv("DEEPSEEK_API_KEY"),
+        temperature=1.0,
+        max_retries=2,
+        timeout=None,
+        max_tokens=None,
+    )
+
+    response = llm.invoke(formatted_prompt)
+
+    return {"messages": AIMessage(content=response.content)}
+
+
 builder = StateGraph(OverallState)
 
 builder.add_node("generate_query", generate_query)
 builder.add_node("web_research", web_research)
 builder.add_node("reflection", reflection)
+builder.add_node("finalize_answer", finalize_answer)
 
 builder.add_edge(START, "generate_query")
 builder.add_conditional_edges(
     "generate_query", continue_to_web_research, ["web_research"]
 )
 builder.add_edge("web_research", "reflection")
-builder.add_edge("reflection", END)
+builder.add_conditional_edges(
+    "reflection", evaluate_research, ["web_research", "finalize_answer"]
+)
+builder.add_edge("finalize_answer", END)
 
 graph = builder.compile(name="deep_research")
