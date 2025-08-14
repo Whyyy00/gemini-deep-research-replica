@@ -7,7 +7,7 @@ import operator
 class OverallState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], add_messages]
     search_query: Annotated[List, operator.add]
-    search_result: Annotated[List, operator.add]
+    web_search_result: Annotated[List, operator.add]
     sources_gathered: Annotated[List, operator.add]
     max_research_loops: int
     research_loop_count: int

@@ -1,10 +1,5 @@
 from schemas import SearchQueryList
-from state import (
-    OverallState,
-    QueryGenerationState,
-    WebSearchResultState,
-    WebSearchState,
-)
+from state import OverallState, QueryGenerationState, WebSearchState
 from prompts import get_current_date
 from prompts import generate_query_prompt, summarize_prompt
 from configuration import Configuration
@@ -65,7 +60,7 @@ def continue_to_web_research(state: QueryGenerationState):
     ]
 
 
-def web_research(state: WebSearchState):
+def web_research(state: WebSearchState) -> OverallState:
     """Langgraph node that search one query using Tavily API.
 
     Args:
@@ -80,9 +75,9 @@ def web_research(state: WebSearchState):
     tavily_client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
 
     # Web search based on the query
-    search_query = state["search_query"]
+    query = state["search_query"]
     response = tavily_client.search(
-        query=search_query,
+        query=query,
         topic="general",
         max_results=configurable.max_search_results,
         include_raw_content=True,
@@ -90,76 +85,40 @@ def web_research(state: WebSearchState):
     web_search_result = [result["raw_content"] for result in response["results"]]
     sources_gathered = [result["url"] for result in response["results"]]
 
-    return Send(
-        "summarize_result",
-        {
-            "web_search_query": search_query,
-            "web_search_result": web_search_result,
-            "sources": sources_gathered,
-        },
-    )
-
-
-# def continue_to_summarize(state: WebSearchResultState):
-#     return Send(
-#         "summarize_result",
-#         {
-#             "web_search_result": state["web_search_result"],
-#             "web_search_query": state["web_search_query"],
-#         },
-#     )
-
-
-def summarize_result(state: WebSearchResultState) -> OverallState:
-    """Langgraph result that summarize multiple searching result for a query.
-
-    Args:
-        state (WebSearchResultState): current state containing search query, web search result and sources gathered.
-
-    Returns:
-        OverallState: Dictionary with updates, including web search reusult and sources gathered.
-    """
-
-    configurable = Configuration()
-
-    # Init the llm
     llm = ChatDeepSeek(
-        model=configurable.summarize_model,
+        model=configurable.query_generator_model,
         api_key=os.getenv("DEEPSEEK_API_KEY"),
-        temperature=1.0,
+        temperature=0.3,
         max_retries=2,
         timeout=None,
         max_tokens=None,
     )
 
-    concat_reusult = "\n\n".join(state["web_search_result"])
+    concat_result = "\n\n".join(web_search_result)
 
     formatted_prompt = summarize_prompt.format(
-        web_search_result=concat_reusult,
-        research_topic=state["web_search_query"],
         current_date=get_current_date(),
+        web_search_result=concat_result,
+        research_topic=query,
     )
 
-    summary = llm.invoke(formatted_prompt)
+    response = llm.invoke(formatted_prompt)
 
-    return {"search_result": [summary], "sources_gathered": state["sources"]}
+    return {
+        "web_search_result": [response.content],
+        "sources_gathered": sources_gathered,
+    }
 
 
 builder = StateGraph(OverallState)
 
-# Add nodes
 builder.add_node("generate_query", generate_query)
 builder.add_node("web_research", web_research)
-builder.add_node("summarize_result", summarize_result)
 
-# Add edges
 builder.add_edge(START, "generate_query")
 builder.add_conditional_edges(
     "generate_query", continue_to_web_research, ["web_research"]
 )
-# builder.add_conditional_edges(
-#     "web_research", continue_to_summarize, ["summarize_result"]
-# )
-builder.add_edge("summarize_result", END)
+builder.add_edge("web_research", END)
 
 graph = builder.compile(name="deep_research")
